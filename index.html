@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DB-NADI — Monitoring Armada</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+ 
+  <style>
+    :root { 
+      --bg: #050d1a; --surface: #0d1b2e; --surface2: #132038; --border: #1e3354; 
+      --text: #e2eaf5; --text2: #7a9cbf; --amber: #f59e0b; --amber-dim: rgba(245,158,11,0.12); 
+      --green: #10b981; --green-dim: rgba(16,185,129,0.12); --yellow: #eab308; --yellow-dim: rgba(234,179,8,0.12); 
+      --red: #ef4444; --red-dim: rgba(239,68,68,0.12); --blue: #38bdf8; --blue-dim: rgba(56,189,248,0.12);
+      --sidebar-bg: #0b1524;
+    }
+ 
+    [data-theme="light"] {
+      --bg: #f4f7f9; --surface: #ffffff; --surface2: #f1f5f9; --border: #cbd5e1; 
+      --text: #0f172a; --text2: #64748b; --sidebar-bg: #ffffff;
+    }
+    
+    ::-webkit-scrollbar { display: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    
+    html { background: var(--bg); min-height: 100%; transition: background-color 0.3s; }
+    body { background: var(--bg); color: var(--text); font-family: 'Nunito', sans-serif; min-height: 100vh; min-height: 100dvh; overflow-x: hidden; -ms-overflow-style: none; scrollbar-width: none; transition: background-color 0.3s, color 0.3s; }
+    
+    .view-header { display: flex; align-items: center; gap: 15px; margin-bottom: 18px; }
+    .hamburger-inline { background: transparent; border: none; color: var(--text); font-size: 24px; cursor: pointer; transition: 0.2s; padding: 0; }
+    .hamburger-inline:hover { color: var(--amber); }
+ 
+    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.6); z-index: 999; backdrop-filter: blur(2px); opacity: 0; transition: opacity 0.3s; }
+    .sidebar-overlay.show { display: block; opacity: 1; }
+    
+    .sidebar { position: fixed; top: 0; left: -300px; width: 280px; height: 100vh; height: 100dvh; background: var(--sidebar-bg); border-right: 1px solid var(--border); z-index: 1000; overflow-y: auto; transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: 4px 0 15px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+    .sidebar.open { transform: translateX(300px); }
+    
+    .sidebar-header { padding: 25px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; }
+    .sidebar-logo { width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; }
+    .sidebar-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
+    .sidebar-badges { display: flex; gap: 6px; margin-top: 4px; }
+    .sidebar-badge { font-size: 9px; font-family: 'Nunito', sans-serif; background: var(--surface2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; color: var(--text2); }
+    
+    .sidebar-section { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; margin: 20px 20px 8px; letter-spacing: 1px; }
+    .sidebar-menu { list-style: none; padding: 0 10px; }
+    .sidebar-menu li { margin-bottom: 2px; }
+    .sidebar-menu a { display: flex; align-items: center; padding: 12px 15px; color: var(--text); text-decoration: none; font-size: 14px; border-radius: 8px; transition: 0.2s; font-weight: 600; cursor: pointer; }
+    .sidebar-menu a i { width: 24px; font-size: 16px; color: var(--text2); transition: 0.2s; }
+    .sidebar-menu a:hover, .sidebar-menu a.active { background: var(--surface2); color: var(--amber); }
+    .sidebar-menu a:hover i, .sidebar-menu a.active i { color: var(--amber); }
+    
+    .has-submenu > a { position: relative; }
+    .caret { position: absolute; right: 15px; font-size: 12px; transition: transform 0.3s; }
+    .has-submenu.open > a .caret { transform: rotate(180deg); }
+    
+    .submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: rgba(0,0,0,0.1); border-radius: 8px; }
+    .submenu a { padding: 10px 15px 10px 45px; font-size: 13px; font-weight: 500; }
+    
+    .theme-switch-wrapper { padding: 15px 20px; border-top: 1px solid var(--border); margin-top: 20px; display: flex; align-items: center; justify-content: space-between; }
+    .theme-label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--surface2); border: 1px solid var(--border); transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: var(--text2); transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--amber); border-color: var(--amber); }
+    input:checked + .slider:before { transform: translateX(20px); background-color: #fff; }
+ 
+    .view { display: none; min-height: 100%; } .view.active { display: block; animation: fadeIn 0.4s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .form-group { margin-bottom: 14px; position: relative; }
+    .form-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text2); margin-bottom: 6px; }
+    .form-select { width: 100%; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 15px; font-family: 'Nunito', sans-serif; outline: none; transition: border-color 0.2s; }
+    .form-select:focus { border-color: var(--amber); }
+    
+    .tv-wrap { padding: 20px 24px 32px; min-height: 100vh; min-height: 100dvh; }
+    .tv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .tv-branding { display: flex; align-items: center; gap: 14px; }
+    .tv-main-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--amber); margin-bottom: 0; }
+    .tv-subtitle { font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.5px; margin-top: -2px; }
+    
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .kpi-card-label { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text2); margin-bottom: 8px; }
+    .kpi-card-val { font-family: 'IBM Plex Mono', monospace; font-size: 42px; font-weight: 600; }
+    
+    .table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+    .table-header-custom { display: flex; justify-content: space-between; align-items: center; background: rgba(13, 27, 46, 0.6); padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .table-title { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; text-transform: uppercase; color: var(--amber); letter-spacing: 1px; }
+    .live-kpi-indicators { display: flex; align-items: center; gap: 15px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: bold; }
+    .live-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--green); animation: blink 1.5s infinite; }
+    .live-dot::before { content: ""; display: inline-block; width: 8px; height: 8px; background-color: var(--green); border-radius: 50%; }
+ 
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 14px 20px; text-align: left; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+    th:hover { background: rgba(150,150,150,0.05); }
+    td { padding: 14px 20px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    
+    .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 12px 24px; border-radius: 30px; font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; z-index: 9999; transition: transform 0.3s; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast-ok { background: var(--green); } .toast-err { background: var(--red); }
+ 
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; height: 100dvh; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center; }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 90%; max-width: 450px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .modal-close { position: absolute; top: 10px; right: 15px; color: var(--red); font-size: 20px; font-weight: bold; cursor: pointer; }
+    .modal-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: bold; color: var(--amber); margin-bottom: 15px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .modal-body { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .modal-body a { color: var(--blue); text-decoration: none; }
+ 
+    .skeuo-card {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 6px 6px 12px rgba(0,0,0,0.4), -6px -6px 12px rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.02);
+      transition: all 0.3s ease;
+    }
+    
+    .skeuo-input {
+      background: var(--surface);
+      border: none;
+      box-shadow: inset 3px 3px 6px rgba(0,0,0,0.5), inset -3px -3px 6px rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      width: 100%;
+      outline: none;
+      font-family: 'Nunito', sans-serif;
+    }
+    
+    .skeuo-input:focus {
+      outline: 2px solid var(--amber);
+    }
+ 
+    [data-theme="light"] .skeuo-card {
+      box-shadow: 6px 6px 12px #d1d9e6, -6px -6px 12px #ffffff;
+      border: none;
+    }
+    [data-theme="light"] .skeuo-input {
+      box-shadow: inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff;
+    }
+ 
+    .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
+    .chart-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; color: var(--amber); margin-bottom: 15px; text-transform: uppercase; }
+ 
+    @media (max-width: 600px) {
+      .modal-box {
+        position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100% !important; height: 100% !important;
+        max-width: none !important; border-radius: 0 !important; border: none !important; overflow-y: auto;
+        padding: 24px; display: flex; flex-direction: column;
+      }
+      .modal-close { top: 20px; right: 20px; font-size: 28px; padding: 5px; z-index: 9999; }
+    }
+ 
+    /* === STYLING CUSTOM UNTUK MANAJEMEN SENTIMEN === */
+    .premium-map-container {
+      height: 450px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      z-index: 1;
+    }
+    .sentiment-pill {
+      display: inline-flex; padding: 6px 14px; border-radius: 30px; font-size: 12px; font-weight: 700; align-items: center; gap: 6px;
+    }
+    .sent-pos { background: rgba(16,185,129,0.15); color: var(--green); }
+    .sent-neu { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .sent-neg { background: rgba(239,68,68,0.15); color: var(--red); }
+    
+    .agent-grid-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+    @media (max-width: 900px) {
+      .agent-grid-layout { grid-template-columns: 1fr; }
+    }
+    .review-scroll-box {
+      max-height: 385px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;
+    }
+    .review-item-card {
+      background: var(--surface2); border-radius: 12px; padding: 12px; border: 1px solid var(--border); transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .review-item-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+ 
+    .leaflet-tooltip.modern-tooltip {
+        background: rgba(13, 27, 46, 0.85);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(56,189,248,0.3);
+        border-radius: 8px;
+        color: #fff;
+        padding: 10px 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .leaflet-tooltip.modern-tooltip::before { display: none; }
+    .modern-popup .leaflet-popup-content-wrapper {
+        background: rgba(13, 27, 46, 0.95);
+        border: 1px solid var(--border);
+        color: #fff;
+        border-radius: 12px;
+    }
+    .modern-popup .leaflet-popup-tip { background: rgba(13, 27, 46, 0.95); border: 1px solid var(--border); }
+    
+    .cross-hover:hover { background: rgba(255,255,255,0.05); }
+    .jne-custom-marker {
+      border-radius: 50%; border: 2px solid #38bdf8; box-shadow: 0 4px 6px rgba(0,0,0,0.3); object-fit: cover; background: #fff;
+    }
+    .komp-custom-marker {
+      border-radius: 50%; border: 2px solid #ef4444; box-shadow: 0 4px 6px rgba(0,0,0,0.3); object-fit: cover; background: #fff;
+    }
+    .status-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .s-queuing { background: var(--blue-dim); color: var(--blue); } 
+    .s-unloading { background: var(--amber-dim); color: var(--amber); } 
+    .s-done { background: var(--green-dim); color: var(--green); }
+  </style>
+</head>
+<body>
+ 
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+ 
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <img src="logo-nadi.png" alt="Logo NADI" style="width: 40px; height: auto;">
+    </div>
+      <div class="sidebar-title">
+      DB-NADI
+      <div class="sidebar-badges">
+        <span class="sidebar-badge">Web v2.1.0</span>
+        <span class="sidebar-badge">Android v1.6.0</span>
+      </div>
+    </div>
+  </div>
+ 
+  <div class="sidebar-section">ANALITIK</div>
+  <ul class="sidebar-menu">
+    <li class="has-submenu">
+      <a href="#" class="toggle-submenu"><i class="fa-solid fa-chart-line"></i> Laporan Kinerja <i class="fa-solid fa-chevron-down caret"></i></a>
+      <ul class="submenu">
+       <li><a href="#">Laporan Mingguan</a></li>
+       <li><a href="#">Laporan Bulanan</a></li>
+       <li><a href="#">Perbandingan Periode</a></li>
+      </ul>
+    </li>
+    <li class="has-submenu open">
+      <a href="#" class="toggle-submenu"><i class="fa-solid fa-users-gear"></i> Manajemen Sentimen <i class="fa-solid fa-chevron-down caret"></i></a>
+      <ul class="submenu" style="max-height: 150px;">
+       <li><a href="#" onclick="setView('manajemen-agen'); closeSidebar();" class="active">Daftar Warehouse</a></li>
+       <li><a href="#" onclick="setView('manajemen-agen'); closeSidebar();">Monitoring Area</a></li>
+      </ul>
+    </li>
+    <li class="has-submenu">
+      <a href="#" class="toggle-submenu"><i class="fa-solid fa-boxes-stacked"></i> Pengiriman <i class="fa-solid fa-chevron-down caret"></i></a>
+      <ul class="submenu">
+       <li><a href="#">Status Paket</a></li>
+       <li><a href="#">SLA Tracking</a></li>
+       <li><a href="#">Keluhan Pengiriman</a></li>
+      </ul>
+    </li>
+  </ul>
+ 
+  <div class="sidebar-section">PENGEMBANGAN</div>
+  <ul class="sidebar-menu">
+    <li class="has-submenu">
+      <a href="#" class="toggle-submenu"><i class="fa-solid fa-circle-question"></i> Bantuan & Info <i class="fa-solid fa-chevron-down caret"></i></a>
+      <ul class="submenu">
+       <li><a href="#" onclick="openModal('modalAbout'); closeSidebar();">ℹ️ About DB-NADI</a></li>
+       <li><a href="#" onclick="openModal('modalHelpCenter'); closeSidebar();">💡 Help Center</a></li>
+       <li><a href="#" onclick="openModal('modalCreator'); closeSidebar();">👤 Profil Kreator</a></li>
+      </ul>
+    </li>
+  </ul>
+ 
+  <div class="theme-switch-wrapper">
+    <div class="theme-label"><i class="fa-solid fa-moon"></i> Mode Gelap</div>
+    <label class="switch">
+      <input type="checkbox" id="theme-switch" onchange="toggleTheme()" checked>
+      <span class="slider round"></span>
+    </label>
+  </div>
+</nav>
+ 
+<div id="view-manajemen-agen" class="view">
+  <div class="tv-wrap">
+    <div class="tv-header">
+      <div class="tv-branding">
+        <button class="hamburger-inline" onclick="openSidebar()"><i class="fa-solid fa-bars"></i></button>
+        <div>
+          <div class="tv-main-title">Analitik Strategis</div>
+          <div class="tv-subtitle">Intelligence Control Center — Agen, Kompetitor, & Ekosistem Customer</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="cross-filter-indicator" style="display:none; padding: 12px 18px; background: rgba(56,189,248,0.15); color: var(--blue); border-left: 4px solid var(--blue); border-radius: 8px; margin-bottom: 20px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="setCrossFilter(null,null)">
+       <span><i class="fa-solid fa-filter"></i> Interactive Filter Aktif: <span id="cf-text" style="color:#fff; text-decoration: underline;"></span></span>
+        <span style="font-size:12px; color:var(--text2); background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px;"><i class="fa-solid fa-xmark"></i> Hapus Filter (Klik)</span>
+    </div>
+ 
+    <div class="kpi-row agent-kpi-row" style="display: flex; overflow-x: auto; flex-wrap: nowrap; gap: 14px; padding-bottom: 10px;">
+      <div class="skeuo-card" style="text-align: center; flex: 1; min-width: 150px;">
+        <div class="kpi-card-label" style="color: var(--text2)">⭐ Rata-Rata Rating JNE</div>
+        <div class="kpi-card-val" id="ag-kpi-rating" style="color: var(--amber)">0.0</div>
+      </div>
+      <div class="skeuo-card" style="text-align: center; flex: 1; min-width: 150px;">
+        <div class="kpi-card-label" style="color: var(--text2)">💬 Total Ulasan Terkumpul</div>
+        <div class="kpi-card-val" id="ag-kpi-reviews" style="color: var(--blue)">0</div>
+      </div>
+      <div class="skeuo-card" style="text-align: center; flex: 1; min-width: 150px;">
+        <div class="kpi-card-label" style="color: var(--text2)">📍 Total Entitas JNE</div>
+        <div class="kpi-card-val" id="ag-kpi-locations" style="color: var(--green)">0</div>
+      </div>
+      <div class="skeuo-card" style="text-align: center; flex: 1; min-width: 150px;">
+        <div class="kpi-card-label" style="color: var(--text2)">📊 Match Filter Terpilih</div>
+        <div class="kpi-card-val" id="ag-kpi-matched" style="color: var(--text)">0</div>
+      </div>
+      <div class="skeuo-card" style="text-align: center; flex: 1; min-width: 150px;">
+        <div class="kpi-card-label" style="color: var(--text2)">🏢 Jumlah Kompetitor</div>
+        <div class="kpi-card-val" id="ag-kpi-kompetitor" style="color: var(--red)">0</div>
+      </div>
+    </div>
+ 
+    <div class="skeuo-card" style="margin-bottom: 25px;">
+      <div class="chart-title"><i class="fa-solid fa-sliders" style="color: var(--blue);"></i> Filter Ekosistem Multi-Dimensi</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+        <div>
+          <label class="form-label">Kategori Warehouse</label>
+          <select id="ag-filter-wh" class="skeuo-input" onchange="triggerAgentAnalytics()">
+            <option value="all">Semua Kategori Warehouse</option>
+            <option value="WAREHOUSE">WAREHOUSE</option>
+            <option value="AGEN">AGEN</option>
+            <option value="CASH COUNTER">CASH COUNTER</option>
+            <option value="CUSTOMER">CUSTOMER</option>
+            <option value="J&T EXPRESS">J&T EXPRESS</option>
+            <option value="NINJA XPRESS">NINJA XPRESS</option>
+            <option value="ID EXPRESS">ID EXPRESS</option>
+            <option value="SICEPAT">SICEPAT</option>
+            <option value="ANTERAJA">ANTERAJA</option>
+            <option value="SPX EXPRESS">SPX EXPRESS</option>
+         </select>
+        </div>
+        <div>
+          <label class="form-label">Kategori Entitas</label>
+          <select id="ag-filter-cat" class="skeuo-input" onchange="triggerAgentAnalytics()">
+            <option value="all">Semua Kategori</option>
+            <option value="JNE">JNE</option>
+            <option value="Customer">Customer</option>
+            <option value="Kompetitor">Kompetitor</option>
+        </select>
+        </div>
+        <div>
+          <label class="form-label">Kota Wilayah (KOTA)</label>
+          <select id="ag-filter-kota" class="skeuo-input" onchange="triggerAgentAnalytics()">
+            <option value="all">Semua Kota</option>
+        </select>
+        </div>
+        <div>
+          <label class="form-label">Kecamatan</label>
+          <select id="ag-filter-kec" class="skeuo-input" onchange="triggerAgentAnalytics()">
+            <option value="all">Semua Kecamatan</option>
+         </select>
+        </div>
+        <div>
+          <label class="form-label">Kelurahan</label>
+          <select id="ag-filter-kel" class="skeuo-input" onchange="triggerAgentAnalytics()">
+            <option value="all">Semua Kelurahan</option>
+         </select>
+        </div>
+      </div>
+    </div>
+ 
+    <div class="agent-grid-layout">
+      <div class="skeuo-card" style="display: flex; flex-direction: column; padding: 15px;">
+        <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span><i class="fa-solid fa-map-location-dot" style="color: var(--amber);"></i> Geospasial Hub & Pemetaan Jarak Terdekat</span>
+          <span id="map-status-dist" style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--blue);">Arahkan Kursor (Hover) pada marker</span>
+        </div>
+        <div id="agent-map-canvas" class="premium-map-container"></div>
+      </div>
+ 
+      <div class="skeuo-card" style="display: flex; flex-direction: column;">
+        <div class="chart-title"><i class="fa-solid fa-brain" style="color: var(--blue);"></i> Analisa Sentimen</div>
+        
+        <div style="background: rgba(0,0,0,0.15); border-radius: 12px; padding: 12px; margin-bottom: 15px; border-left: 3px solid var(--amber);">
+          <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: var(--text2); margin-bottom: 4px;">Kesimpulan Ringkas Sentimen</div>
+          <div id="ag-text-summary" style="font-size: 13px; line-height: 1.5; color: var(--text);">Menganalisa teks ulasan pelanggan...</div>
+        </div>
+ 
+        <div class="review-scroll-box" id="ag-reviews-list">
+        </div>
+      </div>
+    </div>
+ 
+    <div class="chart-grid">
+      <div class="skeuo-card">
+        <div class="chart-title">Rating Per Kategori Warehouse JNE</div>
+        <div style="position: relative; height: 230px;"><canvas id="ag-chart-wh"></canvas></div>
+      </div>
+      <div class="skeuo-card">
+        <div class="chart-title">Top Performa Rating Agen JNE</div>
+        <div style="position: relative; height: 230px;"><canvas id="ag-chart-agent"></canvas></div>
+      </div>
+      <div class="skeuo-card">
+        <div class="chart-title">Donut Distribusi Tipe Ekosistem</div>
+        <div style="position: relative; height: 230px;"><canvas id="ag-chart-donut"></canvas></div>
+      </div>
+    </div>
+ 
+    <div class="table-container" style="margin-top: 25px;">
+      <div class="table-header-custom">
+        <div class="table-title">Daftar Manifest & Basis Data Agen Terintegrasi</div>
+        <div class="live-kpi-indicators">
+          <div class="live-dot" style="color: var(--blue);">DATA INTEGRATED</div>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height: 385px; overflow-y: auto;">
+        <table id="agentMainTable">
+         <thead style="position: sticky; top: 0; background: var(--surface); z-index: 10;">
+            <tr>
+              <th onclick="sortAgentTable(0)">Nama Agen <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortAgentTable(1)">Rating <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortAgentTable(2)">Total Ulasan <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortAgentTable(3)">Kategori WH <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortAgentTable(4)">Kota <i class="fa-solid fa-sort"></i></th>
+              <th onclick="sortAgentTable(5)">Area / Kecamatan <i class="fa-solid fa-sort"></i></th>
+           </tr>
+        </thead>
+          <tbody id="ag-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+ 
+  </div>
+</div>
+ 
+<div class="toast" id="toast"></div>
+ 
+<div class="modal-overlay" id="modalAbout">
+  <div class="modal-box">
+    <span class="modal-close" onclick="closeModal('modalAbout')">✖</span>
+    <div class="modal-title">About DB-NADI</div>
+    <div class="modal-body">
+    <p><b>DB-NADI (Dashboard NADI)</b> adalah sistem monitoring terpadu analitik sentimen.</p><br>
+    <p><b>Versi Sistem:</b><br>
+      - v2.2.0 (Terupdate): Clean Mode UI Sentimen Analysis.</p><br>
+    </div>
+  </div>
+</div>
+ 
+<div class="modal-overlay" id="modalHelpCenter">
+  <div class="modal-box">
+    <span class="modal-close" onclick="closeModal('modalHelpCenter')">✖</span>
+    <div class="modal-title">Help Center</div>
+    <div class="modal-body">
+    <p><b>Cara Menggunakan DB-NADI:</b></p>
+      <ul style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px;">
+      <li><b>Filter Ekosistem:</b> Gunakan *dropdown* untuk menyaring berdasarkan kota atau kategori.</li>
+      <li><b>Geospasial Map:</b> Klik pada *marker* di peta untuk melihat rute integrasi kompetitor dan *customer* terdekat.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+ 
+<div class="modal-overlay" id="modalCreator">
+  <div class="modal-box">
+    <span class="modal-close" onclick="closeModal('modalCreator')">✖</span>
+    <div class="modal-title">👤 Profil Kreator</div>
+    <div class="modal-body" style="text-align: center;">
+      <div style="background: var(--surface2); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--amber);">
+          👨‍💻
+      </div>
+      <h3 style="font-family: 'Rajdhani', sans-serif; font-size: 22px; color: var(--text); margin-bottom: 5px;">Achmad Taufik</h3>
+      <p style="font-size: 14px; color: var(--amber); font-weight: 600; margin-bottom: 15px;">Performance Analyst Officer</p>
+      <p style="font-size: 13px; color: var(--text2); margin-bottom: 20px;">Kreator db-NADI</p>
+ 
+      <div style="text-align: left; background: rgba(0,0,0,0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <p style="margin-bottom: 8px;">📧 <a href="mailto:atte.achmad@gmail.com" style="color: var(--blue);">atte.achmad@gmail.com</a></p>
+        <p style="margin-bottom: 8px;">📞 0857-7930-0030</p>
+        <p>💬 <a href="https://wa.me/6285779300030" target="_blank" style="color: #25D366; text-decoration: none; font-weight: bold;"><i class="fa-brands fa-whatsapp"></i> Chat via WhatsApp</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+<script>
+function openSidebar() {
+ document.getElementById('sidebar').classList.add('open');
+ document.getElementById('sidebarOverlay').classList.add('show');
+}
+function closeSidebar() {
+ document.getElementById('sidebar').classList.remove('open');
+ document.getElementById('sidebarOverlay').classList.remove('show');
+}
+ 
+document.querySelectorAll('.toggle-submenu').forEach(btn => {
+ btn.addEventListener('click', function(e) {
+   e.preventDefault();
+    const li = this.parentElement;
+    const submenu = li.querySelector('.submenu');
+    
+  document.querySelectorAll('.has-submenu.open').forEach(el => {
+      if(el !== li) {
+      el.classList.remove('open');
+      el.querySelector('.submenu').style.maxHeight = null;
+      }
+    });
+ 
+  li.classList.toggle('open');
+    if (li.classList.contains('open')) {
+    submenu.style.maxHeight = submenu.scrollHeight + "px";
+    } else {
+    submenu.style.maxHeight = null;
+    }
+  });
+});
+ 
+function toggleTheme() {
+  const isDark = document.getElementById('theme-switch').checked;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  if(typeof triggerAgentAnalytics === 'function') triggerAgentAnalytics(true);
+}
+ 
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function toast(msg, type) { 
+  const el = document.getElementById('toast'); el.textContent = msg; 
+  el.className = `toast toast-${type==='err'?'err':'ok'} show`; 
+  setTimeout(() => el.classList.remove('show'), 3000); 
+}
+ 
+function setView(v) { 
+ document.querySelectorAll('.view').forEach(el => el.classList.remove('active')); 
+ if(document.getElementById(`view-${v}`)) {
+  document.getElementById(`view-${v}`).classList.add('active'); 
+  }
+  if(v === 'manajemen-agen') {
+    if(typeof initAgentModule === 'function') {
+      if(!agentMap) initAgentModule();
+      else setTimeout(() => agentMap.invalidateSize(), 150);
+      triggerAgentAnalytics();
+    }
+  }
+}
+ 
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; 
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; 
+}
+ 
+const API_URL_AGEN = 'https://script.google.com/macros/s/AKfycbw-QA3Qo9Ga5m3KcrxkDt27o8b_kM0Ti4QNeGtwXTG3-JuzJ1Ko8HsydMDi-Vo7Wm83MA/exec';
+ 
+let isFetching = false;
+let masterAgentData = [];
+let masterReviewData = []; 
+let chartAgentFullNames = []; 
+ 
+let activeCrossFilter = { type: null, value: null };
+ 
+function setCrossFilter(type, value) {
+  if (activeCrossFilter.type === type && activeCrossFilter.value === value) {
+    activeCrossFilter = { type: null, value: null };
+  } else {
+    activeCrossFilter = { type, value };
+  }
+ triggerAgentAnalytics();
+}
+ 
+async function fetchDatabase() {
+  if (isFetching) return;
+  isFetching = true;
+ 
+  try {
+    const resAgent = await fetch(API_URL_AGEN).then(r => r.json()).catch(() => []);
+ 
+    if (resAgent && resAgent.length > 0) {
+      const uniqueAgents = new Map();
+      const reviewsList = [];
+ 
+     resAgent.forEach(item => {
+        let lat = parseFloat(item.Latitude) || null;
+        let lon = parseFloat(item.Longitude) || null;
+        
+        if (lat && Math.abs(lat) > 90) lat = lat / 100000; 
+        if (lon && Math.abs(lon) > 180) lon = lon / 10000; 
+ 
+        const namaAgen = item.Nama_Agen || "Tanpa Nama";
+        const katWH = item["Kategori Warehouse"] ? item["Kategori Warehouse"].toUpperCase().trim() : "WAREHOUSE";
+        const kota = item.KOTA ? item.KOTA.toUpperCase().trim() : "#N/A";
+        const kat = item.Kategori || "JNE";
+        const kecamatan = item.Kecamatan ? item.Kecamatan.toUpperCase().trim() : (item.KECAMATAN ? item.KECAMATAN.toUpperCase().trim() : "TIDAK DIKETAHUI");
+        const kelurahan = item.Kelurahan ? item.Kelurahan.toUpperCase().trim() : (item.KELURAHAN ? item.KELURAHAN.toUpperCase().trim() : "TIDAK DIKETAHUI");
+ 
+        if (!uniqueAgents.has(namaAgen)) {
+         uniqueAgents.set(namaAgen, {
+            Nama_Agen: namaAgen,
+            Link_Maps: item.Link_Maps || "#",
+            Alamat: item.Alamat || "-",
+            Latitude: lat,
+            Longitude: lon,
+            Rating: parseFloat(item.Rating_Rata_Rata) || parseFloat(item.Rating) || 0,
+            Total_Ulasan: parseInt(item.Total_Ulasan_Agen) || parseInt(item.Total_Ulasan) || 0,
+            AREA: item.AREA || "-",
+            Kategori_Warehouse: katWH,
+            Kategori: kat,
+            KOTA: kota,
+            KECAMATAN: kecamatan,
+            KELURAHAN: kelurahan
+          });
+        }
+ 
+        if (item.Teks_Ulasan && item.Teks_Ulasan.trim() !== "") {
+          reviewsList.push({
+            Nama_Agen: namaAgen,
+            Kategori_Warehouse: katWH,
+            Kategori: kat,
+            KOTA: kota,
+            KECAMATAN: kecamatan,
+            KELURAHAN: kelurahan,
+            Rating_Ulasan: parseFloat(item.Rating_Ulasan_Orang) || parseFloat(item.Rating_Rata_Rata) || 0,
+            Teks_Ulasan: item.Teks_Ulasan.trim()
+          });
+        }
+      });
+ 
+      masterAgentData = Array.from(uniqueAgents.values());
+      masterReviewData = reviewsList;
+      populateAgentFilters(); 
+    }
+    
+    const activeView = document.querySelector('.view.active');
+    if (activeView && activeView.id === 'view-manajemen-agen') {
+      triggerAgentAnalytics(true);
+    }
+    
+  } catch (e) {
+    console.error("Gagal sinkronisasi data:", e);
+    toast("Gagal memuat data", "err");
+  } finally {
+    isFetching = false;
+  }
+}
+ 
+function populateAgentFilters() {
+  const setKota = new Set();
+  const setKec = new Set();
+  const setKel = new Set();
+ 
+  masterAgentData.forEach(item => {
+    if(item.KOTA) setKota.add(item.KOTA);
+    if(item.KECAMATAN) setKec.add(item.KECAMATAN);
+    if(item.KELURAHAN) setKel.add(item.KELURAHAN);
+  });
+ 
+  const fill = (id, set, label) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.innerHTML = `<option value="all">Semua ${label}</option>` + Array.from(set).sort().map(i => `<option value="${i}">${i}</option>`).join('');
+  };
+ 
+  fill('ag-filter-kota', setKota, "Kota");
+  fill('ag-filter-kec', setKec, "Kecamatan");
+  fill('ag-filter-kel', setKel, "Kelurahan");
+}
+ 
+let agentMap = null, mapMarkers = [], mapPolylines = [];
+let chartAgentWH = null, chartAgentPerforma = null, chartAgentDonut = null;
+ 
+function initAgentModule() {
+  if (!agentMap) {
+    agentMap = L.map('agent-map-canvas').setView([-6.914744, 107.609810], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap, © CartoDB',
+      maxZoom: 19
+    }).addTo(agentMap);
+  }
+}
+ 
+function triggerAgentAnalytics(skipMap = false) {
+  const whFilter = document.getElementById('ag-filter-wh').value;
+  const catFilter = document.getElementById('ag-filter-cat').value;
+  const kotaFilter = document.getElementById('ag-filter-kota').value;
+  const kecFilter = document.getElementById('ag-filter-kec').value;
+  const kelFilter = document.getElementById('ag-filter-kel').value;
+ 
+  let filteredAgents = masterAgentData.filter(item => {
+    if (whFilter !== 'all' && item.Kategori_Warehouse !== whFilter) return false;
+    if (catFilter !== 'all' && item.Kategori !== catFilter) return false;
+    if (kotaFilter !== 'all' && item.KOTA !== kotaFilter) return false;
+    if (kecFilter !== 'all' && item.KECAMATAN !== kecFilter) return false;
+    if (kelFilter !== 'all' && item.KELURAHAN !== kelFilter) return false;
+    return true;
+  });
+ 
+  if (activeCrossFilter.type !== null) {
+      filteredAgents = filteredAgents.filter(item => {
+          if (activeCrossFilter.type === 'AGENT') return item.Nama_Agen === activeCrossFilter.value;
+          if (activeCrossFilter.type === 'WH_CATEGORY') return item.Kategori_Warehouse === activeCrossFilter.value;
+          if (activeCrossFilter.type === 'DONUT') {
+              if (activeCrossFilter.value.includes('JNE Ekosistem')) return ['JNE'].includes(item.Kategori);
+              if (activeCrossFilter.value.includes('Kompetitor')) return item.Kategori === 'Kompetitor';
+              if (activeCrossFilter.value.includes('Customer')) return item.Kategori === 'Customer';
+          }
+          return true;
+      });
+      document.getElementById('cross-filter-indicator').style.display = 'flex';
+      document.getElementById('cf-text').textContent = activeCrossFilter.value;
+  } else {
+      document.getElementById('cross-filter-indicator').style.display = 'none';
+  }
+ 
+  const allowedAgentNames = new Set(filteredAgents.map(a => a.Nama_Agen));
+  const filteredReviews = masterReviewData.filter(item => allowedAgentNames.has(item.Nama_Agen));
+ 
+  updateAgentKPIs(filteredAgents);
+ 
+  if (skipMap !== true) {
+       renderAgentMap(filteredAgents);
+  }
+ 
+  renderAgentReviews(filteredReviews);
+  renderAgentCharts(filteredAgents);
+  renderAgentTable(filteredAgents);
+}
+ 
+function updateAgentKPIs(data) {
+  let totalRating = 0, totalReviews = 0, locCount = 0;
+  data.forEach(item => {
+    if (item.Kategori !== 'CUSTOMER' && item.Kategori !== 'KOMPETITOR') {
+      totalRating += (parseFloat(item.Rating) || 0);
+      if((parseFloat(item.Rating) || 0) > 0) locCount++;
+    }
+    totalReviews += (parseInt(item.Total_Ulasan) || 0);
+  });
+  
+  document.getElementById('ag-kpi-rating').textContent = locCount > 0 ? (totalRating / locCount).toFixed(1) : "0.0";
+  document.getElementById('ag-kpi-reviews').textContent = totalReviews.toLocaleString('id-ID');
+  document.getElementById('ag-kpi-locations').textContent = data.filter(i => ['WAREHOUSE','AGEN','CASH COUNTER'].includes(i.Kategori_Warehouse)).length;
+  document.getElementById('ag-kpi-matched').textContent = data.length;
+  document.getElementById('ag-kpi-kompetitor').textContent = data.filter(i => i.Kategori && i.Kategori.toLowerCase() === 'kompetitor').length;
+}
+ 
+let hoverPolylines = [];
+function clearHoverLines() {
+    hoverPolylines.forEach(p => agentMap.removeLayer(p));
+    hoverPolylines = [];
+}
+ 
+function renderAgentMap(data) {
+  mapMarkers.forEach(m => agentMap.removeLayer(m));
+  mapPolylines.forEach(p => agentMap.removeLayer(p));
+  mapMarkers = []; mapPolylines = [];
+ 
+  if (data.length === 0) return;
+ 
+  data.forEach(item => {
+    if (!item.Latitude || !item.Longitude) return;
+ 
+    let markerIcon;
+    if (item.Kategori === 'Kompetitor' || (item.Kategori && item.Kategori.toLowerCase() === 'kompetitor')) {
+        markerIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/atteachmad/db-nadi-bdo/main/kompetitor.png', iconSize: [28,28], iconAnchor:[14,28], className: 'komp-custom-marker' });
+    } else if (item.Kategori === 'Customer' || (item.Kategori && item.Kategori.toLowerCase() === 'customer')) {
+        markerIcon = L.divIcon({ html: '<i class="fa-solid fa-house-user" style="color:#10b981; font-size:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.5);"></i>', className: '', iconSize: [20,20], iconAnchor:[10,20] });
+    } else {
+        markerIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/atteachmad/db-nadi-bdo/main/joni.png', iconSize: [32, 32], iconAnchor: [16, 32], className: 'jne-custom-marker' });
+    }
+ 
+    const customMarker = L.marker([item.Latitude, item.Longitude], { icon: markerIcon }).addTo(agentMap);
+ 
+    let nearestComp = null;
+    let minCompDist = Infinity;
+    let nearestCust = null;
+    let minCustDist = Infinity;
+    let distanceHTML = "";
+    
+    // PERBAIKAN: Menggunakan template literal yang benar
+    let gmapsUrl = item.Link_Maps || `https://www.google.com/maps/search/?api=1&query=$${item.Latitude},${item.Longitude}`;
+ 
+    if (item.Kategori !== 'Kompetitor' && item.Kategori !== 'Customer' && item.Kategori?.toLowerCase() !== 'kompetitor' && item.Kategori?.toLowerCase() !== 'customer') {
+        data.forEach(subItem => {
+            if (subItem.Latitude && subItem.Longitude) {
+                let d = getDistance(item.Latitude, item.Longitude, subItem.Latitude, subItem.Longitude);
+                if (subItem.Kategori && subItem.Kategori.toLowerCase() === 'kompetitor') {
+                    if (d < minCompDist) { minCompDist = d; nearestComp = subItem; }
+                } else if (subItem.Kategori && subItem.Kategori.toLowerCase() === 'customer') {
+                    if (d < minCustDist) { minCustDist = d; nearestCust = subItem; }
+                }
+            }
+        });
+ 
+        let cText = nearestComp ? `${nearestComp.Nama_Agen} (${minCompDist < 1000 ? Math.round(minCompDist) + ' m' : (minCompDist/1000).toFixed(2) + ' km'})` : '-';
+        let custText = nearestCust ? `${nearestCust.Nama_Agen} (${minCustDist < 1000 ? Math.round(minCustDist) + ' m' : (minCustDist/1000).toFixed(2) + ' km'})` : '-';
+ 
+        distanceHTML = `
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.2); font-size: 11px; text-align: left; line-height: 1.3;">
+                <span style="color: #ef4444;"><i class="fa-solid fa-store"></i> <b>Komp Terdekat:</b><br>${cText}</span><br>
+                <span style="color: #10b981;"><i class="fa-solid fa-house-user"></i> <b>Cust Terdekat:</b><br>${custText}</span>
+            </div>
+        `;
+ 
+        if (nearestComp && nearestCust) {
+            gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=$${item.Latitude},${item.Longitude}&destination=${nearestComp.Latitude},${nearestComp.Longitude}&waypoints=${nearestCust.Latitude},${nearestCust.Longitude}`;
+        } else if (nearestCust) {
+            gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=$${item.Latitude},${item.Longitude}&destination=${nearestCust.Latitude},${nearestCust.Longitude}`;
+        } else if (nearestComp) {
+            gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=$${item.Latitude},${item.Longitude}&destination=${nearestComp.Latitude},${nearestComp.Longitude}`;
+        }
+    }
+ 
+    const tooltipHTML = `
+        <div style="text-align:center; font-family:'Nunito',sans-serif; min-width: 150px;">
+            <div style="color:var(--blue);font-size:14px;font-weight:bold;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">${item.Nama_Agen}</div>
+            <div style="color:var(--amber);font-size:12px;font-weight:bold;">⭐ ${item.Rating > 0 ? item.Rating : '-'} | 💬 ${item.Total_Ulasan} Ulasan</div>
+            <div style="color:var(--green);font-size:10px;text-transform:uppercase;margin-top:4px;">${item.Kategori_Warehouse}</div>
+            ${distanceHTML}
+        </div>
+    `;
+    customMarker.bindTooltip(tooltipHTML, { direction: 'top', offset: [0, -20], className: 'modern-tooltip' });
+    
+    const popupHTML = `
+        <div style="text-align:center; padding: 5px; font-family:'Nunito',sans-serif;">
+            <div style="color:var(--amber); font-size: 14px; font-weight:bold; margin-bottom: 8px;">${item.Nama_Agen}</div>
+            <a href="${gmapsUrl}" target="_blank" style="background:var(--blue); color:#fff; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:12px; font-weight:bold; display:inline-block;"><i class="fa-solid fa-map"></i> Buka Google Maps Rute</a>
+        </div>
+    `;
+    customMarker.bindPopup(popupHTML, {className: 'modern-popup'});
+    
+    customMarker.on('click', () => { 
+        setCrossFilter('AGENT', item.Nama_Agen); 
+    });
+ 
+    customMarker.on('mouseover', function() {
+        this.openTooltip();
+        if (['JNE', 'Kompetitor'].includes(item.Kategori) || item.Kategori.toLowerCase() === 'kompetitor') {
+            clearHoverLines();
+            if (nearestCust) {
+                const polyCust = L.polyline([[item.Latitude, item.Longitude], [nearestCust.Latitude, nearestCust.Longitude]], {color: '#10b981', weight: 2, dashArray: '5, 8'}).addTo(agentMap);
+                hoverPolylines.push(polyCust);
+            }
+            if (nearestComp) {
+                const polyComp = L.polyline([[item.Latitude, item.Longitude], [nearestComp.Latitude, nearestComp.Longitude]], {color: '#ef4444', weight: 2, dashArray: '5, 8'}).addTo(agentMap);
+                hoverPolylines.push(polyComp);
+            }
+        }
+    });
+ 
+    customMarker.on('mouseout', function() {
+        this.closeTooltip();
+        clearHoverLines();
+    });
+ 
+  mapMarkers.push(customMarker);
+  });
+ 
+  const group = new L.featureGroup(mapMarkers);
+  if(mapMarkers.length > 0) agentMap.fitBounds(group.getBounds().pad(0.1));
+}
+ 
+function renderAgentReviews(reviewData) {
+  const container = document.getElementById('ag-reviews-list'); if(!container) return;
+  
+  if(reviewData.length === 0) {
+   container.innerHTML = '<div style="color:var(--text2);text-align:center;padding:20px;">Tidak ada ulasan pada data yang difilter.</div>';
+  document.getElementById('ag-text-summary').innerHTML = "Belum ada teks ulasan yang memadai untuk dianalisa.";
+    return;
+  }
+ 
+  let totalScore = 0;
+  let htmlContent = ""; 
+ 
+  const limitedReviews = reviewData.slice(0, 50);
+ 
+  limitedReviews.forEach(item => {
+    totalScore += (item.Rating_Ulasan || 0);
+    let sentimentClass = "sent-neu"; let sentText = "NETRAL";
+    if (item.Rating_Ulasan >= 4.0) { sentimentClass = "sent-pos"; sentText = "POSITIF"; }
+    else if (item.Rating_Ulasan <= 3.0) { sentimentClass = "sent-neg"; sentText = "NEGATIF"; }
+ 
+    htmlContent += `
+      <div class="review-item-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-weight:700; font-size:13px; color:var(--text);">${item.Nama_Agen}</span>
+          <span class="sentiment-pill ${sentimentClass}">${sentText}</span>
+        </div>
+        <div style="font-size:11px; color:var(--amber); margin-bottom:4px;">⭐ ${item.Rating_Ulasan.toFixed(1)}</div>
+        <p style="font-size:12px; color:var(--text2); line-height:1.4;">"${item.Teks_Ulasan}"</p>
+      </div>
+    `;
+  });
+ 
+  container.innerHTML = htmlContent; 
+ 
+  const avg = totalScore / limitedReviews.length;
+  const summaryText = document.getElementById('ag-text-summary');
+  if (avg >= 4.0) summaryText.innerHTML = "<b>Dominan Positif:</b> Pelanggan sangat puas dengan pelayanan yang ada. Pertahankan kualitas pelayanan di titik agen terkait.";
+  else if (avg <= 2.5) summaryText.innerHTML = "<b>Perhatian Kritis:</b> Ditemukan sentimen negatif berulang terkait proses tracking dan kecepatan layanan operasional.";
+  else summaryText.innerHTML = "<b>Sentimen Netral:</b> Pelayanan dinilai standar dan stabil, namun ada sedikit ruang perbaikan agar customer lebih puas.";
+}
+ 
+function renderAgentCharts(data) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#e2eaf5' : '#4b5563';
+  Chart.defaults.color = textColor;
+  Chart.defaults.font.family = "'Nunito', sans-serif";
+ 
+  // Chart 1
+  const whLabels = ['WAREHOUSE', 'AGEN', 'CASH COUNTER'];
+  const whValues = whLabels.map(label => {
+    const matched = data.filter(i => i.Kategori_Warehouse === label && i.Rating > 0);
+    if(matched.length === 0) return 0;
+    return matched.reduce((acc, curr) => acc + curr.Rating, 0) / matched.length;
+  });
+ 
+  const ctxWH = document.getElementById('ag-chart-wh');
+  if(ctxWH) {
+    if (chartAgentWH) chartAgentWH.destroy();
+    chartAgentWH = new Chart(ctxWH, {
+      type: 'bar',
+      data: {
+        labels: whLabels,
+        datasets: [{ data: whValues, backgroundColor: '#f59e0b', borderRadius: 12, barThickness: 30 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { min: 0, max: 5 }, x: { grid: { display: false } } },
+        onClick: (e, activeEls) => {
+            if (activeEls.length > 0) {
+                const label = whLabels[activeEls[0].index];
+               setCrossFilter('WH_CATEGORY', label);
+            }
+        }
+      }
+    });
+  }
+ 
+  // Chart 2
+  const agentItems = data.filter(i => ['WAREHOUSE','AGEN','CASH COUNTER'].includes(i.Kategori_Warehouse) && i.Rating > 0).sort((a,b) => b.Rating - a.Rating).slice(0, 5);
+  chartAgentFullNames = agentItems.map(i => i.Nama_Agen);
+ 
+  const ctxAgent = document.getElementById('ag-chart-agent');
+  if(ctxAgent) {
+    if (chartAgentPerforma) chartAgentPerforma.destroy();
+    chartAgentPerforma = new Chart(ctxAgent, {
+      type: 'bar',
+      data: {
+        labels: agentItems.map(i => i.Nama_Agen.substring(0, 15) + '...'),
+        datasets: [{ data: agentItems.map(i => i.Rating), backgroundColor: '#38bdf8', borderRadius: 12, barThickness: 25 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { title: (ctx) => chartAgentFullNames[ctx[0].dataIndex] } } },
+        scales: { x: { min: 0, max: 5 }, y: { grid: { display: false } } },
+        onClick: (e, activeEls) => {
+            if (activeEls.length > 0) {
+                const fullName = chartAgentFullNames[activeEls[0].index];
+               setCrossFilter('AGENT', fullName);
+            }
+        }
+      }
+    });
+  }
+ 
+  // Chart 3
+  const jneCount = data.filter(i => ['JNE'].includes(i.Kategori)).length;
+  const kompCount = data.filter(i => i.Kategori === 'Kompetitor' || (i.Kategori && i.Kategori.toLowerCase() === 'kompetitor')).length;
+  const custCount = data.filter(i => i.Kategori === 'Customer' || (i.Kategori && i.Kategori.toLowerCase() === 'customer')).length;
+  
+  const donutLabels = [`JNE Ekosistem (${jneCount})`, `Kompetitor (${kompCount})`, `Customer (${custCount})`];
+  const donutValues = [jneCount, kompCount, custCount];
+ 
+  const ctxDonut = document.getElementById('ag-chart-donut');
+  if(ctxDonut) {
+    if (chartAgentDonut) chartAgentDonut.destroy();
+    chartAgentDonut = new Chart(ctxDonut, {
+      type: 'doughnut',
+      data: {
+        labels: donutLabels,
+        datasets: [{ data: donutValues, backgroundColor: ['#f59e0b', '#ef4444', '#10b981'], borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: { 
+        responsive: true, maintainAspectRatio: false, cutout: '70%', 
+        plugins: { legend: { position: 'bottom' } },
+        onClick: (e, activeEls) => {
+            if (activeEls.length > 0) {
+                const label = donutLabels[activeEls[0].index];
+                setCrossFilter('DONUT', label);
+            }
+        }
+      }
+    });
+  }
+}
+ 
+function renderAgentTable(data) {
+  const tbody = document.getElementById('ag-table-body'); if(!tbody) return;
+ 
+  if(data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2);">Data kosong atau filter tidak cocok.</td></tr>';
+    return;
+  }
+ 
+  let htmlContent = ""; 
+  data.forEach(item => {
+    let statCls = 's-queuing';
+    if(item.Kategori === 'Kompetitor' || item.Kategori?.toLowerCase() === 'kompetitor') statCls = 's-unloading';
+    if(item.Kategori === 'Customer' || item.Kategori?.toLowerCase() === 'customer') statCls = 's-done';
+    
+    // PERBAIKAN: Mengganti &quot; di sini agar string aman dalam HTML
+    const escapedName = item.Nama_Agen.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+ 
+    htmlContent += `
+      <tr onclick="setCrossFilter('AGENT', '${escapedName}')" style="cursor:pointer;" title="Klik untuk memfilter (Cross-Filtering)" class="cross-hover">
+        <td style="font-weight:700; color:var(--text);">${item.Nama_Agen}</td>
+       <td><b style="color:var(--amber)">⭐ ${item.Rating > 0 ? item.Rating.toFixed(1) : '-'}</b></td>
+        <td style="font-family:'IBM Plex Mono',monospace;">${item.Total_Ulasan}</td>
+      <td><span class="status-badge ${statCls}" style="font-size:10px;">${item.Kategori_Warehouse}</span></td>
+      <td>${item.KOTA}</td>
+      <td><span style="color:var(--text2);">${item.KECAMATAN} / ${item.KELURAHAN}</span></td>
+      </tr>
+    `;
+  });
+  
+  tbody.innerHTML = htmlContent; 
+}
+ 
+let agentSortDirection = false;
+function sortAgentTable(columnIndex) {
+  agentSortDirection = !agentSortDirection;
+  const keys = ['Nama_Agen', 'Rating', 'Total_Ulasan', 'Kategori', 'KOTA', 'AREA'];
+  const key = keys[columnIndex];
+ 
+  masterAgentData.sort((a, b) => {
+    let valA = a[key] || ''; let valB = b[key] || '';
+    if (typeof valA === 'string') {
+      return agentSortDirection ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    } else {
+      return agentSortDirection ? valA - valB : valB - valA;
+    }
+  });
+  triggerAgentAnalytics();
+}
+ 
+// START SISTEM
+fetchDatabase();
+setView('manajemen-agen');
+setInterval(fetchDatabase, 60000);
+</script>
+</body>
+</html>
