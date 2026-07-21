@@ -436,6 +436,7 @@
      1. PERFORMA  : debounce, chart.update() tanpa destroy, DocumentFragment
      2. CASCADING : filter kota/kec/kel saling terhubung otomatis (Power BI style)
      3. MAP ROUTE : popup dengan tombol rute Google Maps ke Customer & Kompetitor
+     4. PROGRESSIVE DISCLOSURE: Otomatis filter ke Bandung - Andir saat load/refresh
      ============================================================ -->
 <script>
 // ================================================================
@@ -522,6 +523,7 @@ function setView(v) {
 const API_URL_AGEN = 'https://script.google.com/macros/s/AKfycbw-QA3Qo9Ga5m3KcrxkDt27o8b_kM0Ti4QNeGtwXTG3-JuzJ1Ko8HsydMDi-Vo7Wm83MA/exec';
 
 let isFetching = false;
+let isFirstLoad = true; // Flag untuk load pertama kali
 let masterAgentData   = [];
 let masterReviewData  = [];
 let chartAgentFullNames = [];
@@ -556,6 +558,9 @@ function mapApplyCrossFilter(idx) {
 async function fetchDatabase() {
   if (isFetching) return;
   isFetching = true;
+  
+  const currentFirstLoad = isFirstLoad; // Simpan status
+  isFirstLoad = false;                  // Set false setelah dicegat agar tidak loop terus
 
   const controller = new AbortController();
   const tid = setTimeout(() => controller.abort(), 20000);
@@ -623,6 +628,24 @@ async function fetchDatabase() {
 
     // Populate all filter dropdowns (cascading-aware)
     updateCascadingFilters('init');
+
+    // ====================================================================
+    // TAMBAHKAN KODE INI: Paksa Filter Default ke Bandung - Andir saat Load Pertama
+    // ====================================================================
+    if (currentFirstLoad) {
+      const kotaEl = document.getElementById('ag-filter-kota');
+      const kecEl = document.getElementById('ag-filter-kec');
+      
+      if (kotaEl && Array.from(kotaEl.options).some(o => o.value === 'BANDUNG')) {
+        kotaEl.value = 'BANDUNG';
+        updateCascadingFilters('kota'); // Refresh cascading anak (Kecamatan)
+      }
+      if (kecEl && Array.from(kecEl.options).some(o => o.value === 'ANDIR')) {
+        kecEl.value = 'ANDIR';
+        updateCascadingFilters('kec');  // Refresh cascading anak (Kelurahan)
+      }
+    }
+    // ====================================================================
 
   } catch (e) {
     clearTimeout(tid);
@@ -1104,7 +1127,7 @@ function renderAgentCharts(data) {
   const ctxDonut = document.getElementById('ag-chart-donut');
   if (ctxDonut) {
     if (chartAgentDonut) {
-      chartAgentDonut.data.labels            = donutLabels;
+      chartAgentDonut.data.labels          = donutLabels;
       chartAgentDonut.data.datasets[0].data  = donutValues;
       chartAgentDonut.update('active');
     } else {
